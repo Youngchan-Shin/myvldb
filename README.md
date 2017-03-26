@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-Hi~
-=======
-# test
->>>>>>> 6268d0b23f6d7aac9ac54f1d63305e4c6fe2db3c
+#This github is for my paper in college.
+
+#If you want overview of suggestion note, you can show it on SuggestionNote.txt
