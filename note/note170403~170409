@@ -1,0 +1,45 @@
+20170403~20170409 노트
+
+* 계획
+ - 유닉스 리눅스 프로그래밍 필수 유틸리티 정독
+ - 교수님 말씀 정리
+ - ForestDB에서의 WAL 기능 찾고 분석
+
+* 유닉스 리눅스 프로그래밍 필수 유틸리티 정독
+ - vim의 기능 
+   int myfunc(void) 함수 찾기 :
+     egrep "int[[:space:]]+myfunc[[:space:]]*\(.(\)[[:space:]]*\{" ./ -Rlz
+   정규식은 외우기!!!:
+   창분할 ctrl+w (w 이동 v 수직분할 q종료)
+   마킹 m+(대문자면 전역 소문자면 지역
+   ctags 명령어 익히기
+   screen - 새로운 가상 터미널 생성
+   man page
+   :20vs
+   폴딩 기능 v]} 하면 블록 zf가 폴딩 zo가 풀기
+  
+
+* 교수님 말씀 정리
+ - mysql은 사용자가 commit 할 때 남아있어서 buffer replacement가 일어나서
+  forest db는 durability를 어떻게 보장?
+  >  fdb_commit이라는 걸 호출해야 그사이 break로
+  >  buffer replacement가 일어나면 그냥 nothing으로 처리
+ - 해야할 일 - WAL을 NVDIMM으로
+              1. WAL이 무엇인지, 왜 저장해야하는지 이해
+	      2. NVDIMM으로 테스트까지
+ - 정보과학회 논문으로 제출 가능할까?
+  >  WAL을 직접 떼어 봐야 nvdimm실험이 가능함 WAL부터 공부해야함
+
+ - ForestDB의 WAL은 이름만 WAL. 실제 로그를 남기는 것이 아니라 계속 파일 끝에 추가
+ - index block을 생성하기 전에 미리
+  >  index block이 생성이 안되면 WAL에 써진 데이터들은...
+ - random write할 때 read 와 write의 블록 문제
+  >  sequential과 random이 차이가 있긴 한데 write가 끝나야 read가 일어나기 때문에
+ - forestdb 옵션도 사용자가 fdb_commit h를 호출했을 때 durability 위에서 바로 인덱스 블록을 만들어주는 경우도 있고 아니면 옵션으로 그걸 풀고 durability는 알아서 직접
+   =====================================================================
+   1. WAL이 무엇인지, 그리고 왜 저장해야하는지
+   2. mysql에서 WAL저장 방식 데이터 및 언제 일어나는지 학습
+   3. forestDB에서의 WAL기능 정리(DB의 durability보장 관련해서!)
+     (성공한 트랜잭션은 영원히 반영. 모든 트랜잭션은 로그로 남고 시스템 장애발생 전 상태로 되돌릴 수 있어야함. 트랜잭션은 로그에 모든 것이 저장된 후에만 commit 상태로 간주)
+   4. 직접 WAL 파일 만들기
+
