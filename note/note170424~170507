@@ -1,0 +1,10 @@
+20170424~20170507 노트
+
+* 계획
+ - forestdb 코드분석 전체적인 flow 이해하기 - forestdb.h forestdb.cc
+ - forestdb에서 WAL기능 이해하기
+ - 안정상박사 논문읽기 - Indexing for persistent Key-Value Storage
+
+* forestdb.cc 코드 WAL 관련 함수 분석
+ - void _fdb_restore_wal
+ - getWal

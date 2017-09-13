@@ -1,0 +1,32 @@
+20170703~20170709 노트
+
+* 계획
+ - Mysql Insert Buffer 코드 분석
+
+* Mysql Insert Buffer(= change buffer) 코드 분석
+ 1. ibuf0ibuf.h
+   insert buffer의 merge는 항상 성공해야함->2bits per page in the insert buffer bitmap이 가능한 공간을 가리키는데 이를 통해 계속 buffer operation이 가능한 페이지의 빈 공간을 track. mini-transaction에 있는 bitmap의 bits를 decrement하거나 reset
+   - ibuf_init_at_db_start()	insert buffer data structure를 만듦
+
+ 2. ibuf0ibuf.cc
+
+
+* 정리
+  내가 알던 데이터들(id, name, grade...) 등이 밑단에서 실제로 어떻게 저장되는지를 다루는게 engine인데 MySQL에서는 MyISAM과 Innodb가 있다. MyISAM은 예전 방식이라 이제는 default가 Innodb로 되어있다.
+  Clustered Index는 Primary Key로 정렬되어 있고 table도 row들이 Primary Key의 순서로 정렬되어있다. B+tree구조는 leaf에 값을 저장하는 방식이므로 leaf들의 entry값이 그대로 table record이다. Secondary Index는 Clustered Index의 값을 Primary Key가 아닌 다른 값으로 정렬되어있는 값이다. 그러다보니 non-unique하고 table record의 정렬된 것과 leaf들의 entry가 정렬된 것이 일치하지 않는다. 그런데 Clustered Index에서 예로 (Pk, A)가 수정이 되면 Secondary Index에서도 (A, PK)를 찾아서 값을 수정해줘야 하는데 만약 buffer pool에 있다면 그냥 바로 buffer pool에서 수정을 해주면 되지만 그렇지 않은 경우, 트리의 leaf들과 table record가 일치하지 않다보니 random access로 찾게 되고 이는 과도한 I/O 호출을 야기한다. 그렇기에 Insert Buffer 트리를 사용하는데 이 트리에는 변경사항에 (space, page, cnt)를 추가해서 저장한다. 각각의 페이지들의 저장은 tablespace에 1번 page부터 ibuf_bitmap_page에 정보가 담기게 된다. default page size는 16KB로 되어있고 16KB 다음에 또 다른 16KB가 붙는 방식이다.
+  그렇게 Insert Buffer의 값을 저장하다보면 이 값들을 merge해야 할 때가 온다. 크게 4가지 경우가 있는데 다음과 같다.
+   1) ibuf_io_complete()가 호출 되었을 때로 page read가 발생했을 때이다.
+   2) buf_page_create()가 호출 되었을 때로 강제로 insert buffer page가 날라갔다던지 해서 새로 page를 만들었을 때이다. 가끔 발생하는 특수한 케이스다.
+   3) ibuf_contract_in_background()가 호출되었을 때로 데이터베이스에 여유가 있을 때 처리되어지는 때이다. default인 buffer pool의 25퍼센트가 찬 ibuf_max_size일 때에도 처리된다.
+   4) ibuf_contract()가 호출 되었을 때로 가끔 발생한다. 
+
+ ==> 내가 봐야하는 부분들 - 이황교 석사님이 수정하시던 부분들
+   1) ibuf_merge_or_delete_page() => 실제로 merge되는 부분. 매우 중요!
+      -> 이 함수를 부르는 함수와 이 함수 내에서 부르는 함수들 잘 볼 것!
+   2) btr_cur_search_to_nth_level() 이 ibuf_insert()를 호출함. 호출하는 조건 잘 보기
+      -> 이 함수도 유심히 봐야함
+   3) Secondary Index에서 Insert, Del_mark, Delete 할 때
+      row0ins.cc -> Insert - new entry
+      row0upd.cc -> Del_mark - invalid
+      row0purge.cc -> Delete - Purge
+  이 세 개의 파일들의 각 항목들도 매우 중요함

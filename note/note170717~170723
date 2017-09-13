@@ -1,0 +1,44 @@
+20170717~20170723 노트
+
+* 계획
+ - innodb sysbench 실험 돌리고 실험 결과 분석
+ - 이황교석사님이 짠 코드 분석
+ - 목요일 세미나(20) 발표준비 -> 그 다음주 수요일로(26)
+
+* innodb sysbench 실험 돌리고 실험 결과 분석
+ 1. 실험결과
+  size=10000000, max-time=600, max-request=0 실험
+  테이블 4개로 하고 실험
+
+* 이번주 세미나 - 박준호 transaction-oriented database recovery
+
+	 direct page allocation - 
+	 indirect page allocation cow방식 이해하기
+	 ftl
+	 steal 정책
+	 fuzzy checkpoint
+ Q1 wal 방식은 indirect page allocation 방식 아닌가요?
+    맞다면, 아까 direct page allocation 방식에서 consistency를 위해 wal을 쓴다고 하신거같은데 그럼 direct아닌가요?
+ Q2 dirty page가 무언갈 써서 변경되었는데 커밋되지 않은 페이지를 말하는거 맞나요?
+
+ Q3 transaction consistent checkpoint를 현실적으로 못쓰는게 block 시간이 길어서였죠? 
+ 
+ Q4 steal이 트랜잭션이 점유하는 메모리 페이지 가져와서 바로 하는건가요? 제대로 이해를 못해서...
+
+ Q5 indirect page allocation에서 cow방식이 뭔가요?
+
+ 1. 그 sqlite가 DB file이랑 wal file 두개가 Database를 이루는 파일인데 buffer에서 page가 내려갈때는 항상 wal file로만 내려가요
+
+	그래서 page를읽을때는 wal file을 먼저 보면서 찾는 page가 있는지 보고 없으면 database file을 찾아보는 식인데 checkpoint가 일어날때마다 wal에 있는 page들을 DB file로 옮겨적어요
+
+	여기서 buffer 관점에서는 indirect page allocation (out of place write)가 맞는데 checkpoint가 일어날때는 원래 대응되어있는 page에 쓰게 되기 떄문에 direct page allocation (in place write)라고 볼수도 있어요 
+
+ 2. 넹
+
+ 3. 넹 버퍼의 크기가 커질 수록 dirty page가 많아지는데 많을 수록 block시간은 길어지게 되는거. 근데 거기다 요청하는 트랜잭션의 수도 많으면 다들 막혀가지고 못쓰게 되요
+
+ 4. transaction 도중에 dirty page가 생길때 그 트랜잭션이 commit 되기 전에 page를 내려버리는게 steal 정책이에요. no steal은 commit될때까지 buffer에서 dirty page를 가지고 있는거에요
+
+ 5. indirect page allocation이 cow랑 똑같은 거에요
+		copy on write 
+

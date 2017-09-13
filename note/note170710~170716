@@ -1,0 +1,24 @@
+20170710~20170716 노트
+
+* 계획
+ - innodb 이해
+ - Mysql Insert Buffer 코드 분석
+
+* innodb 이해
+ 1. innodb 특징
+  - row-level locking
+  - MVCC - readers don't block writers
+  - crash recovery
+  - transaction support : ACID compliance
+  - index only scans
+  - insert buffering(change buffering)
+ 2. tablespace
+  - consists of multiple files and/or raw disk partitions
+  - file/partition is a collection of segments
+  - segment consists of fixed-leength pages
+  - uncompressed tablespace는 default사이즈 16KB, compressed는 1~16KB
+   (data랑 index 둘다)
+  - system tablespace구성 : internal data dictionary(catalog), undo, change buffering, doublewrite buffer, mysql replication info
+ 3. Buffer Pool
+  - data pages, index pages, undo records, adaptive hash index
+* MySQL Insert Buffer 코드 분석

@@ -1,0 +1,21 @@
+20170904~20170917 노트
+
+* 계획
+  - SSD에서 실험 돌리며 에러로그 보며 디버깅
+  - ibuf 함수에서 수정된 부분들 검사하기
+
+
+* 현재 btr_cur_optimistic_insert_low_check 에서 clust_index_entry 가 찍힌다
+ -> if문으로 !dict_index_is_clust(index) 걸어줘서 걸러내기
+   -> true이면 index가 clust에
+   -> false면 index가 secondary에
+
+* 로그 쿼리 -> 주보에게 다시 물보기
+
+* optimistic 과 pessimistic 조건에 대해 좀 더 공부하기
+
+* 디버깅 하면서 필요한 부분
+ redo log 찾아볼것
+ recovery 함수
+ 프로세스 쓰레드 트랜잭션 아이디
+ mysql sql로그 찍는거 찾기

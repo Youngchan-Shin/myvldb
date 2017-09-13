@@ -1,0 +1,36 @@
+20170731~20170813 노트
+
+* 계획
+ - SSD에서 실험 돌리기
+ - SSD세팅 공부
+
+
+* ssd 세팅
+
+ lsblk
+ sudo hdparm -I /dev/sda
+ sudo fdisk /dev/sda
+
+ sudo mkfs.ext4 /dev/sda1
+ sudo mount -o barrier=0 /dev/sda1 ~/works/data/
+ sudo mount -o barrier=0 /dev/sdb1 ~/works/log/
+ ls -lh
+ sudo chown youngchan:youngchan data/
+
+
+* SSD 초기화
+
+ 0. 먼저 mount부터 내리기 sudo umount /dev/sdb1
+
+ 1. Secure Erase - 이건 벤더에서 제공하는 것 => SSD마다 될 수도 있고 아닐 수도 있음 (850pro는 OK!
+    방법 : sudo hdparm --user-master u --security-set-pass (임의비번) (장치위치 ex. dev/sda1)
+	ex : sudo hdparm --user-master u --security-set-pass 1 /dev/sda
+         sudo hdparm --user-master u --security-erase (임의비번) (장치위치)
+	ex : sudo hdparm --user-master u --security-erase 1 /dev/sda
+	   주의) 단 sudo hdparm -I (장치) 했을 때 not frozen이어야 함
+    -> 리부팅 하면 frozen 이 되는 경우가 있는데 그럴 때는 부팅한 채에서 SSD 전원을 빼놓고 10초가량 후 다시 끼면 됨
+
+ 2. Linux에서 제공하는 "dd" 명령어 사용 - 기본적으로 다 가능하지만 느리다
+	방법 : sudo dd if=/dev/zero of=(장치위치)
+	    -> 장치당 두번씩 해줘야 됨 + 구글에서 옵션 더 찾아보기
+	    + 황교형 tip : dd *** /dev/sda 를 하고서 두번째 sda dd할때 뒤에 &를 달아 백그라운드에서 돌아가게 하면서 dd *** /dev/sdb를 함 -> 이러면 시간 단축

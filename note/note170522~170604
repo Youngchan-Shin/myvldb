@@ -1,0 +1,22 @@
+20170522~20170604 노트
+
+* 계획
+ - mysql WAL 추가 공부
+ - forestdb.cc, wal.cc에서 WAL 함수 분석
+ - 안정상박사 논문읽기 - Indexing for persistent Key-Value Storage
+
+* mysql WAL 추가 공부
+ - traditional rollback journal에서는 original database의 복사본을 작성하고 난 뒤 database 파일에 직접 변경 사항을 작성한다. crash나 rollback이 일어나면 롤백저널에 있는 원본 파일을 불러오게 된다. Commit은 롤백저널이 삭제되면 발생한다.
+ - WAL은 이를 뒤엎는다. original content는 그대로 보존되어있고, 변경된 것들이 분리된 WAL 파일에 추가된다. Commit은 WAL에 특정 커밋 문구가 추가되면 발생한다. 
+
+ - WAL 파일 트랜잭션을 다시 데이터베이스로 이동하는 것을 ‘Checkpoint'라고 한다.
+ - 롤백저널 방법에서는 읽기, 쓰기 두가지 작업이지만, wal에는 읽기, 쓰기, checkpointing.
+ - 기본적으로 SQL은 wal 파일이 1000페이지크기가 되면 checkpoint를 자동적으로 수행
+ - 읽기작업이 WAL 모드 데이터베이스에서 시작하면 마지막으로 유효한 커밋기록의 위치를 기억하는데 이를 ‘end mark’라고 한다.
+ - WAL은 여러 사용자가 사용하게 되면 계속 추가될 수 있어서, 각 사용자는 각자의 end mark를 가질 수 있다. 그러나 트랜잭션 기간에 end mark는 변하지 않으므로, 단일 read 트랜잭션은 single point 에서의 데이터베이스 내용만 볼 수 있다.
+ - reader가 컨텐츠 페이지를 얻으려할 때 먼저 WAL을 체크해서 reader의 end mark 이전에 발생한 페이지의 마지막 복사본을 가져옵니다. WAL에 없다면, original 데이터베이스 파일에서 읽는다. reader들은 다른 프로세스에서 있을 수 있으므로, 페이지를 찾기 위해 모든 WAL을 보는대신 wal-index를 이용해서 최소의 I/O로 빠르게 찾을 수 있다. wal-index는 reader의 성능을 향상시키지만, 공유된 메모리를 사용하기에 모든 reader가 같은 기계안에 있어야한다. 이는 곧 WAL이 네트워크 파일시스템에서 왜 사용되지 않는지를 말해준다.
+ - checkpoint는 WAL과 얼마나 떨어져있는지를 기억해서 다음 호출시 중단된 곳부터 컨텐츠 전송을 재개한다.
+
+* forestdb.cc 코드 WAL 관련 함수 분석
+
+* wal.cc 코드 분석

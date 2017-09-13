@@ -1,0 +1,41 @@
+20170508~20170521 노트
+
+* 계획
+ - mysql WAL 공부
+ - forestdb.cc, wal.h, wal.cc에서 WAL 함수 분석
+ - 안정상박사 논문읽기 - Indexing for persistent Key-Value Storage
+
+* mysql WAL 공부
+ - WAL과 rollback journal의 비교
+  (장점)
+  대부분의 시나리오에서 WAL이 눈에 띄게 빠르다.
+  reader가 writer를 block하지 않고, writer도 reader를 block하지 않는다. 그러므로 Reading과 Writing은 concurrently하게 작동한다.
+  Disk I/O의 작동이 WAL을 사용하면 더 연관적이게 작동하는 경향이 있다.
+  WAL은 fsync() 함수를 적게 불러와 fsync()가 호출될 때 시스템상의 취약점 문제에 덜 영향을 받는다.
+  (단점)
+  WAL은 일반적으로 VFS가 shared-memory primitive를 제공하는 것을 요구한다.
+  데이터베이스를 사용하는 모든 프로세스들은 같은 호스트 컴퓨터에 있어야한다. WAl은 네트워크 파일시스템에서 작동하지 않는다.
+  각 개별 데이터베이스에 대해서는 원자성으로 가지지만 모든 데이터베이스에서 세트로는 원자성을 갖지 않는다.
+  WAL 모드에 들어가면 page size를 변경할 수 없다. 이를 변경하려면 rollback journal 모드에 있어야 한다.
+  읽기 전용의 WAL 데이터베이스를 열 수 없다.
+  WAL은 대부분 읽기만 하고 거의 쓰지 않는 어플리케이션에서 rollback journal보다 1~2% 느리다.
+* forestdb.cc 코드 WAL 관련 함수 분석
+	 - void _fdb_restore_wal(FdbKvsHandle *handle, fdb_restore_mode_t mode, bid_t hdr_bid, fdb_kvs_id_t kv_id_req)
+
+	 - getWal
+
+* wal.h 코드 분석
+     - fdb_status insert_Wal(fdb_txn, struct _fdb_key_cmp_info, fdb_doc, uint64_t, wal_insert_by)
+
+	 - fdb_status immediateRemove_Wal(fdb_txn, struct _fdb_key_cmp_info, fdb_doc, uint64_t, wal_insert_by)
+
+	 - fdb_status find_Wal(fdb_txn, struct _fdb_key_cmp_info, Snapshot, fdb_doc, uint64_t)
+
+	 - fdb_status findWithKvid_Wal(fdb_txn, fdb_kvs_id_t, struct _fdb_key_cmp_info, Snapshot, fdb_doc, uint64_t)
+
+	 - fdb_status migrateUncommittedTxns_Wal( void, void, FileMgr, FileMgr, wal_doc_move_func)
+
+	 - fdb_status commit_Wal(fdb_txn, wal_commit_mark_func, ErrLogCallback)
+
+	 - fdb_status releaseFlushedItems_Wal
+* wal.cc 코드 분석

@@ -1,0 +1,154 @@
+20170821~20170903 노트
+
+* 계획
+ - SSD에서 실험 돌리며 에러로그 보며 디버깅
+
++ 실험 정리
+./configure --without-drizzle --with-mysql-includes=~/works/ins_mysql/include/mysql --with-mysql-libs=~/works/ins_mysql/lib/
+
+* 서버 돌리기
+ mysqld_safe --defaults-file=~/.my.cnf
+
+* 덤프 뜨기
+ $> mysqldump -uroot sbtest > loaddump.sql
+
+* 복구 하기
+ $> mysql -uroot sbtest < loaddump.sql
+
+* 백업하기
+ cp -r before_load_log/ ~/works/log/ && cp -r before_load_last/ ~/works/last/ && cp -r before_load_ins_mysql/ ~/works/ins_mysql
+
+* dump
+ (1) mysqladmin -uroot create sbtest
+ (2) ./load_db.sh
+ (3) $> mysqldump -uroot sbtest > loaddump.sql
+
+* 실험할 때마다
+ (1) mysqladmin -uroot drop sbtest
+ (2) mysqladmin -uroot shutdown
+ (3) mysqladmin -uroot create sbtest
+ (4) $> mysql -uroot sbtest < loaddump.sql
+ (5) ./go_db.sh
+
+* sysbench: error while loading shared libraries 뜰때
+ - export LD_LIBRARY_PATH=/home/youngchan/works/ins_mysql/lib/
+
+
+* backup 폴더의 파일들
+ - before파일들 : load 하기 전 기본설정파일들
+ - ex파일들 : 이전에 실험했던 파일들
+ - load파일들 : load 실행하고 go하기 전 파일들
+ - sample파일 : 처음 설치하기 전 파일(황교형꺼 위치들만 내 폴더로 바꾼거)
+
+* 에러로그 
+  7fe1c772f700  InnoDB: unable to find a record to delete-mark
+  InnoDB: tuple DATA TUPLE: 2 fields;
+   0: len 4; hex 012f65da; asc  /e ;;
+   1: len 4; hex 01318f51; asc  1 Q;;
+
+  InnoDB: record PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+   0: len 4; hex 012f65da; asc  /e ;;
+   1: len 4; hex 012ea68a; asc  .  ;;
+
+  space 10 offset 302567 (1141 records, index id 31)
+	InnoDB: Submit a detailed bug report to http://bugs.mysql.com
+
+  ** dtuple_print(stderr, entry)
+	DATA TUPLE: 2 fields;                 <-n_fields값 == dtuple_get_n_fields(tuple)
+    0: len 4; hex 012f65da; asc  /e ;;   <-dfield_print_raw에서 찍히는거
+    1: len 4; hex 01318f51; asc  1 Q;;     ->ut_print_buf(f, dfield_get_data(dfield), print_len)					
+
+	data = (const byte*) buf
+	*data++
+
+  ** rec_print(stderr, page_cur_get_rec(&page_cur_get_rec(&page_cur), index);
+	 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+	  0: len 4; hex 012f65da; asc  /e ;;
+	  1: len 4; hex 012ea68a; asc  .  ;;
+  *** n_fields 값이 2
+
+  insert buffer 내용 merge하고도 안지움
+
+  (1) row_ins_sec_index_entry_low()		
+	  -> btr_cur_optimistic_insert()		
+      -> btr_cur_optimistic_insert_low()	btr0cur.cc	check	호출하는인자
+	  -> btr_cur_optimistic_update
+	 		btr_cur_update_in_place			ing
+	  -> btr_cur_optimistic_delete_func()
+      -> btr_cur_pessimistic_insert()				check	호출하는인자
+
+
+  (2) row_upd_sec_index_entry()
+  (3) row_purge_remove_secs_if_poss()
+	  ->	~_leaf() - optimistic
+	  ->	~_tree() - pessimistic
+  (4) btr_cur_optimistic_delete()
+  (5) btr_cur_pessimistic_delete()
+  (6) dtuple_print(file*, entry)
+
+
++ update_ibuf_bitmap에 대해 이해 필요
+
+* 디버깅 코드 짤 떄 참고
+	const char* file,
+	ulint line,
+	const char* function
+
+	FILE* fp;
+	fp = fopen("/home/youngchan/works/check/btr_cur_optimistic_insert_low_check","a");
+
+	fprintf(fp, "\n[Opt_INSERT] page_cursor %lu, index %lu", page_cursor, index);
+	fprintf(fp, "CALLER >> file %s, line %lu, function %s\n", file, line, function);
+	dtuple_print(fp, entry);
+	fclose(fp);
+
+
+	insert buffer record
+	first field : page number
+	second field : array - type info for each subsequent field
+	third field : page number
+	fourth field : type info, 
+	rest : actual index record
+	=>
+	1. 2bytes : counter field(sort records within a space id, page no
+	2. 1byte : operation type
+	3. flags
+
+	Insert Buffer
+
+	ibuf0ibuf.cc
+ // hgyolee
+ // If the number of entries stored in Insert Buffer < IBUF_COUNT_THRESHOLD,
+ // entries will not be removed from Insert Buffer after merging, and
+ // the merged index page will not be flushed to disk.
+ // ***** There are some exceptional cases. e.g.) force_flush
+    if (page_zip) {
+       ibuf_update_free_bits_zip(block, mtr);
+    } else {
+       ibuf_update_free_bits_low(block, max_ins_size, mtr);
+    }
+
+* 현재 실험 세팅
+ #!/bin/bash
+ SYSBENCH_TESTS="delete.lua \
+                 insert.lua \
+                 oltp_complex_ro.lua \
+                 oltp_complex_rw.lua \
+                 oltp_simple.lua \
+                 select.lua \
+                 update_index.lua \
+                 update_non_index.lua"
+ NUM_THREADS=16
+ SYSBENCH_DIR=${HOME}/works/sysbench/
+ TEST_DIR=${SYSBENCH_DIR}/sysbench/tests/db
+ ./sysbench/sysbench/sysbench \
+         --test=${TEST_DIR}/oltp.lua \
+         --oltp-table-size=40000000 \
+         --oltp-tables-count=4 \
+         --max-time=0 \
+         --max-requests=10000000 \
+         --mysql-table-engine=InnoDB \
+         --mysql-user=root \
+         --mysql-engine-trx=yes \
+         --num-threads=$NUM_THREADS \
+         prepare

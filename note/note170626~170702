@@ -1,0 +1,66 @@
+20170626~20170702 노트
+
+* 계획
+ - Mysql InnoDB 이해
+ - Mysql Insert Buffer 이해
+ - 석사 이황교형 연구자료 이해
+ - LSBM-tree: Re-enabling Buffer Caching in Data Management for mixed Reads and Writes 논문 읽기
+
+* Mysql InnoDB 이해
+ (1) 트랜잭션-세이프 스토리지 엔진
+ (2) MyISAM과 비슷하지만 ORACLE처럼 많은 기능을 지원(* commit, rollback, 장애복구, row-level locking, 외래키 등)
+ (3) 다수의 사용자 동시접속과 퍼포먼스가 증가하여 대용량 데이터를 처리할 때 최대의 퍼포먼스를 내도록 설계
+   - CPU효율은 어느 디스크 기반의 데이터베이스와 비교해도 손색이 없고 자체적으로 메인 메모리 안에 데이터 캐싱과 인덱싱을 위한 풀(pool)을 관리
+ (4) 테이블과 인덱스를 테이블 스페이스에 저장을 하고 테이블 스페이스는 몇 개의 서버파일이나 디스크 파티션으로 구성. 이는 MyISAM과 다른 점인데, MyISAM은 테이블과 인덱스를 각각 분리된 파일로 관리한다.     테이블 인덱스에 대해 잘 알아보기!
+ (5) InnoDB 테이블은 OS의 파일 사이즈 한계가 2GB이더라도 상관없이 어느 크기나 가질 수 있음
+ (6) InnoDB는 높은 퍼포먼스가 필요한 대용량 사이트에 적합
+ (7) my.ini 파일 설정
+
+* innodb_buffer_pool_size
+  - 현재 자신의 시스템 메모리의 50~80% 사이로 만듭니다.
+
+* innodb_additional_mem_pool_size
+  - 데이터 사전정보나 내부의 데이터 구조 정보를 담는 메모리
+  - 보통 2M정도. 만약 메모리 공장이 부족하면 error log에 warning 메시지를 남기니 그때 늘리면 됨
+
+* innodb_flush_log_at_trx_commit
+  - insert, update 등 데이터 삽입과 관련.
+  - commit을 하였을 때 그 즉시 commit 된 데이터를 log file에 기록할지 안할지를 설정
+  - 로그파일을 기록할 경우 갑작스러운 경우 데이터 손실을 막을 수 있지만 매번 로그를 기록하므로 속도가 저하됨
+  - 1일 경우 기록을 함, 0이 기록을 안함.
+* innodb_log_file_size
+  - 트랜잭션을 기록하는 로그 파일의 크기를 결정하는 옵션
+  - inno_buffer_pool_size 옵션은 성능을 위한 것이지만 시스템이 다운되었을 경우 데이터가 손실. 방지하기 위해 log file을 만들어 commit될 때마다 로그에 기억을 하고 자동복구
+  - 로그파일은 무한정 계속 커지는 것이 아니라 일정한 크기와 개수를 가지고 순환식으로 처리되므로 크기는 inno_buffer_pool_size의 15%정도로 설정
+* innodb_log_buffer_size
+  - 로그 파일을 기록하기 위한 버퍼 사이즈
+  - 트랜잭션이 작거나 거의 없다면 크게 잡는 것은 낭비이므로 보통 1M~8M사이로 설정
+
+* Mysql Insert Buffer 이해( = change buffer)
+  - 사용하는 이유
+    -> 데이터입력이 발생하는 경우 clustered index의 경우, 일반적으로 PK key 순으로 이루어지는 경우가 많아, random read가 많이 발생하지 않는다. 하지만, Secondary index의 경우 non-unique인 경우가 많기에 상대적으로 random order 작업이 많이 발생하여 Disk I/O가 많이 발생하게 된다. 이런 Secondary index의 Disk I/O를 줄이기 위해 Insert Buffer를 사용한다.
+  - 동작
+    (1) Secondary Index에 대한 입력 작업이 발생하는 경우 해당 페이지가 Buffer Pool안에 존재하는지 확인
+    (2) Buffer Pool안에 존재하면 작업을 바로 하지만, 아닌 경우 해당 작업을 insert buffer에 저장(insert buffer는 전체 buffer pool안에 맞게 작은 사이즈로 유지되며, 이 입력 작업은 매우 빠르게 진행될 수 있음)
+  - insert buffer에 대한 작업
+    (1) InnoDB는 디스크 I/O작업을 saving 하기 위해 Index Tree 안에 같은 페이지에 속하는 여러 insert 작업을 merge함
+    (2) 페이지 별로 merge한 작업을 진행
+    (3) 정기적으로 secondary index에 merge(index tree의 같은 페이지에 여러 insertion을 merge 할 수 있음)
+* insert buffer merging은 inserting transaction이 커밋된 후에 진행될 수 있다.
+* insert buffer merging은 여러 secondary index가 업데이트 되고, 많은 row들이 추가될 때 많은 시간이 걸린다. 이 때 disk I/O는 증가되어 disk-bound query들에 확연한 slowdown을 야기한다.
+  - 특징
+    (1) change buffering은 leaf page oriented이다.
+    (2) buffered change는 NUSI의 특정 leaf page에 발생하도록 규정되어있다.
+      -> NUSI leaf page들에서 빈 공간을 찾는 것을 가능하게 해야 한다.(B-tree page split이나 B-tree page merge에 영향을 미치면 안되기 때문에)
+  - actual NUSI leaf page로 merge back 하는 경우
+    (1) When these NUSI leaf pages are subsequently read int othe buffer pool, the buffered operations will be merged. A NUSI leaf page could be read into the buffer pool during an index lookup, an index scan or because of read ahead.
+    (2) InnoDB의 master 쓰레드가 ibuf_merge_in_background()을 호출해 buffer merge를 변경할 때
+    (3) 특정 NUSI leaf page에 너무 많은 작업이 buffered 되었을 때
+    (4) change buffer tree가 최대 허용 사이즈에 도달했을 때
+* 석사 이황교형 연구자료 이해
+  - MySQL Insert Buffer의 성능 평가 및 성능 향상 방안에 대한 연구
+    (1) SSD와 HDD에서 insert buffer 성능
+    (2) Ramdisk를 사용하여 메모리 내에 insert buffer 위치
+  - MySQL Insert Buffer의 성능 평가
+    (1) SSD에서의 insert buffer 성능 평가
+    (2) 페이지 크기에 따른 성능 평가
