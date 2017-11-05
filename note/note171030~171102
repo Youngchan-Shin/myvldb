@@ -1,0 +1,34 @@
+실험 노트
+
+* 실험돌릴때 로그 디바이스는 마운트할때 -obarrier=0 옵션
+* 실험전에는 항상 sudo sysctl vm.drop_caches=3
+ 서버끄고 원래쓰던 데이터 로그 지우고 , 데이터 복사 서버 재실행
+
+ ssd특성 대신 InnoDB에서 FLUSH하는 과정에 대해 그림 넣기 또는 innodb_flush_neighbors설정에 따른 flush과정 그림넣기
+
+ 데이터베이스 크기에 따른 차이가 크지 않으면 하나의 데이터베이스 크기에 대해서 WRITE수 , TPS 차이를 알수있게 그래프
+
+ INNODB FLUSH를 없애고 SSD 특성 + neighbor_option 설명 + 그림
+
+ innodb_flush_neighbors
+
+ Specifies whether flushing a page from the InnoDB buffer pool also flushes other dirty pages in the same extent.
+
+ The default value of 1 flushes contiguous dirty pages in the same extent from the buffer pool.
+
+ A setting of 0 turns innodb_flush_neighbors off and no other dirty pages are flushed from the buffer pool.
+
+ A setting of 2 flushes dirty pages in the same extent from the buffer pool.
+
+ When the table data is stored on a traditional HDD storage device, flushing such neighbor pages in one operation reduces I/O overhead (primarily for disk seek operations) compared to flushing individual pages at different times. For table data stored on SSD, seek time is not a significant factor and you can turn this setting off to spread out write operations. For related information, see Section 14.6.3.7, “Fine-tuning InnoDB Buffer Pool Flushing”.
+ 2500	5G
+ 5천	10G
+ 1만	20G
+ 2.5만	50G
+ 5만	100G
+ 10만	200G
+
+ dstat -m
+ du -h
+ dstat -c -m
+
